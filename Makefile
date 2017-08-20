@@ -1,13 +1,13 @@
-deploy:
-	docker-compose up --build --remove-orphans -d
+deploy: build
+	docker-compose up --remove-orphans -d
 
 build:
 	docker-compose build --pull
 
-upf:
-	docker-compose up --build --remove-orphans
+upf: build
+	docker-compose up --remove-orphans
 
-run:
+run: build
 	docker-compose run app ipython
 
 stop:
