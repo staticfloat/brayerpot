@@ -1,3 +1,4 @@
+# brayerpot: take THAT @britwuzhere
 import logging
 import sys
 import shelve
@@ -53,8 +54,8 @@ def is_im_to_me(payload):
 
 
 class DataBase:
-    def __init__(self):
-        self.db = shelve.open("/var/lib/brayerpot/shelve.db")
+    def __init__(self, path):
+        self.db = shelve.open(path)
 
     def close(self):
         self.db.close()
@@ -63,6 +64,7 @@ class DataBase:
         """
         Add a user to a group, returning the group afterward
         """
+        group = group.lower()
         if not group in self.db:
             self.db[group] = [user]
         else:
@@ -76,6 +78,7 @@ class DataBase:
         did not exist, or the user was the last one in that group, delete the
         group completely.
         """
+        group = group.lower()
         if not group in self.db:
             return []
         
@@ -116,7 +119,15 @@ class DataBase:
         """
         Given a group ID, return the group.  Duh.
         """
+        group = group.lower()
         return self.db[group]
+
+db = None
+def get_db():
+    global db
+    if db is None:
+        db = DataBase("/var/lib/brayerpot/shelve.db")
+    return db
 
 
 def handle_help(payload):
@@ -158,12 +169,10 @@ def handle_signup(payload):
     """
     Given a signup command, add the user to groups
     """
-    global db
-
     try:
         group = payload['text'].split("signup")[1].strip().split()[0]
 
-        group_list = db.add_user_to_group(payload['user'], group)
+        group_list = get_db().add_user_to_group(payload['user'], group)
         msg = "Great, you've been added to the *%s* prayer group!"%(group)
 
         if len(group_list) == 1:
@@ -183,6 +192,7 @@ def handle_stop(payload):
     """
     Given a stop command, remove the user from groups
     """
+    db = get_db()
     try:
         group = payload['text'].split("stop")[1].strip().split()[0]
 
@@ -378,7 +388,7 @@ def event_loop():
                         continue
 
                     if at_bot in text:
-                        command = text.split(at_bot)[1].strip().lower()
+                        command = text.split(at_bot)[1].strip().split()[0].lower()
                         
                         # Only pay attention if there is a command
                         if not command:
@@ -388,7 +398,7 @@ def event_loop():
 
                     if payload.get('type', '') == 'message':
                         if is_im_to_me(payload):
-                            command = text.split(' ')[0]
+                            command = text.split()[0].lower()
                             if not command:
                                 continue
 
@@ -407,8 +417,5 @@ def event_loop():
 
 
 if __name__ == "__main__":
-    # Create our global database.  lol.
-    db = DataBase()
-
     logging.basicConfig(level=logging.INFO)
     event_loop()
