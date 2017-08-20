@@ -21,7 +21,7 @@ def slack_call(api_name, **kwargs):
     if api_call.get("ok"):
         return api_call
     else:
-        logging.warn("Could not complete api call %s", api_name)
+        logging.warn("Could not complete api call %s: %s", api_name, api_call)
         raise RuntimeError("slack call %s failed"%(api_name))
 
 def bot_id(force=False):
