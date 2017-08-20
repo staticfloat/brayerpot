@@ -335,7 +335,7 @@ def create_weekly_group_chats():
     For each group that we know about, group the participants into 2s and 3s.
     """
     from random import shuffle
-    global db
+    db = get_db()
 
     for group in db.list_all_groups():
         users = db.get_group(group)
@@ -359,12 +359,12 @@ def create_weekly_group_chats():
 
 def event_loop():
     from time import sleep
-    global db
+    db = get_db()
 
     if not slack_client.rtm_connect():
         logging.error("Could not connect to RTM firehose!")
         raise RuntimeError("rtm_connect() failed")
-    
+
     logging.info("All systems operational")
 
     try:
