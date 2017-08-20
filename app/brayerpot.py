@@ -239,6 +239,11 @@ def handle_unknown(payload):
         as_user=True
     )
 
+def handle_secret_create_chats(payload):
+    name = get_user_first_name(payload['user'])
+    logging.info("RED ALERT! SHIELDS TO MAXIMUM! %s knows our secrets!", name)
+    create_weekly_group_chats()
+
 def handle_command(command, payload):
     """
     Given a command, fork off into different possible handlers.
@@ -251,6 +256,7 @@ def handle_command(command, payload):
         'signup': handle_signup,
         'stop': handle_stop,
         'list': handle_list,
+        'create_chats': handle_secret_create_chats,
     }
 
     handler = commands.get(command, handle_unknown)
