@@ -250,7 +250,8 @@ def handle_command(command, payload):
     """
     Given a command, fork off into different possible handlers.
     """
-    logging.info("Handling command %s", command)
+    name = get_user_first_name(payload['user'])
+    logging.info("Handling command %s from %s", command, name)
 
     # Map from command name to behavior
     commands = {
