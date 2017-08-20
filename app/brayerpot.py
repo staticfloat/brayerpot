@@ -214,7 +214,7 @@ def handle_list(payload):
         group_list_str = "*, *".join(group_list)
         msg = "You are a part of the following prayer groups: *%s*"%(group_list_str)
     else:
-        msg = "You are not a part of any prayer groups. Try `@prayerbot help` to figure out how to join some!"
+        msg = "You are not a part of any prayer groups. Use `@prayerbot signup` to join some, or try `@prayerbot help` to learn more!"
 
     slack_call(
         "chat.postEphemeral",
