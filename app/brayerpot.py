@@ -353,7 +353,7 @@ def create_weekly_group_chats():
 
         for grouping in user_groupings:
             try:
-                create_group_chat(user_groupings)
+                create_group_chat(grouping)
             except:
                 logging.warn("Could not create group chat for %s", ", ".join(grouping))
 
