@@ -342,6 +342,7 @@ def create_weekly_group_chats():
 
         if len(users) == 1:
             logging.warn("Group %s is too lonely, not doing anything", group)
+            continue
 
         # Split `users` up into groups of 2, if we have an uneven number the
         # last group will have 3 people
