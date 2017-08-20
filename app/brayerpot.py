@@ -150,6 +150,8 @@ This will put you into the prayer rotations for the LW guys prayer group, where 
 -  `stop`: If you don't give me a group name, I'll just remove you from all groups you were a part of.
 
 -  `list`: List all groups you're in.
+
+When you are a part of a prayer group, I will randomly pair participants of a group up into prayer buddies once a week on Wednesday nights.
     """
 
     slack_call(
@@ -295,7 +297,7 @@ def create_group_chat(users):
     names_str = "*, *".join(names[:-1]) + "* and *" + names[-1]
     date_str = date.today().strftime("%m/%d/%Y")
 
-    logging.info("Creating group chat between %s", ",".join(names))
+    logging.info("Creating group chat between %s", ", ".join(names))
 
     group_id = slack_call(
         "mpim.open",
