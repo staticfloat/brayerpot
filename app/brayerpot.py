@@ -295,6 +295,8 @@ def create_group_chat(users):
     names_str = "*, *".join(names[:-1]) + "* and *" + names[-1]
     date_str = date.today().strftime("%m/%d/%Y")
 
+    logging.info("Creating group chat between %s", ",".join(names))
+
     group_id = slack_call(
         "mpim.open",
         users=",".join(users + [bot_id()]),
