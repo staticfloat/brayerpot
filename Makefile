@@ -1,6 +1,9 @@
 deploy: build
 	docker-compose up --remove-orphans -d
 
+self-update: build
+	docker-compose up -d app
+
 build:
 	docker-compose build --pull
 

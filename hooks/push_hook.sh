@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cd /code
-git pull && make
+cd /brayerpot
+git pull && make self-update
