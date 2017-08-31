@@ -141,11 +141,11 @@ Hello There!  My name is `@prayerbot`, and I exist to help organize prayers thro
 
 -  `help`: Print out this help message.  You just did this, so you probably don't need me to tell you how to do it again.
 
--  `signup <group>`: Sign up to be a part of prayer group `<group>`. Example:
+-  `signup group`: Sign up to be a part of prayer group `<group>`. Example:
 > *@prayerbot signup LWGuys*
 This will put you into the prayer rotations for the LW guys prayer group, where you will be randomly matched with other guys each week to pray for eachother.
 
--  `stop <group>`: The reverse of the above command; if you don't want to do this anymore, this will take you out of a group you previously signed up for.
+-  `stop group`: The reverse of the above command; if you don't want to do this anymore, this will take you out of a group you previously signed up for.
 
 -  `stop`: If you don't give me a group name, I'll just remove you from all groups you were a part of.
 
