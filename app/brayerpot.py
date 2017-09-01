@@ -56,6 +56,7 @@ def is_im_to_me(payload):
 class DataBase:
     def __init__(self, path):
         self.db = shelve.open(path)
+        logging.info("Loaded databse which knows about %d prayer groups"%(len(self.db.keys())))
 
     def close(self):
         self.db.close()
