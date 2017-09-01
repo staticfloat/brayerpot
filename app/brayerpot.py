@@ -167,8 +167,11 @@ def handle_signup(payload):
     """
     Given a signup command, add the user to groups
     """
+    from re import split, IGNORECASE
+
     try:
-        group = payload['text'].split("signup")[1].strip().split()[0]
+        splitted = split("signup", payload['text'], flags=IGNORECASE)
+        group = splitted[1].strip().split()[0]
 
         group_list = get_db().add_user_to_group(payload['user'], group)
         msg = "Great, you've been added to the *%s* prayer group!"%(group)
@@ -186,13 +189,33 @@ def handle_signup(payload):
         as_user=True
     )
 
+def handle_sign(payload):
+    """
+    Check to see if someone said `sign up foo`, and make it "just work"
+    """
+    from re import split, IGNORECASE
+
+    splitted = split("sign up", payload['text'], flags=IGNORECASE)
+    if len(splitted) == 1:
+        # There was no `sign up` command at all
+        return handle_unknown(payload)
+
+    # Otherwise, just mash it up and call `handle_signup` again with our
+    # properly munged text
+    payload['text'] = 'signup ' + ' sign up '.join(splitted[1:])
+    return handle_signup(payload)
+
+
+
 def handle_stop(payload):
     """
     Given a stop command, remove the user from groups
     """
+    from re import split, IGNORECASE
     db = get_db()
     try:
-        group = payload['text'].split("stop")[1].strip().split()[0]
+        splitted = split("stop", payload['text'], flags=IGNORECASE)
+        group = splitted[1].strip().split()[0]
 
         db.remove_user_from_group(payload['user'], group)
         msg = "You have been removed from the *%s* prayer group."%(group)
@@ -257,6 +280,7 @@ def handle_command(command, payload):
     commands = {
         'help': handle_help,
         'signup': handle_signup,
+        'sign': handle_sign,
         'stop': handle_stop,
         'list': handle_list,
         'create_chats': handle_secret_create_chats,
