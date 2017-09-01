@@ -271,6 +271,26 @@ def handle_secret_create_chats(payload):
     logging.info("RED ALERT! SHIELDS TO MAXIMUM! %s knows our secrets!", name)
     create_weekly_group_chats()
 
+def handle_secret_dump_groups(payload):
+    name = get_user_first_name(payload['user'])
+    logging.info("SET PHASERS TO 'WELL DONE'! %s knows our secrets!", name)
+
+    db = get_db()
+    groups = db.list_all_groups()
+    listings = []
+    for g in groups:
+        user_names = [get_user_full_name(u) for u in db.get_group(g)]
+        listings += ["*%s*: *%s*"%(g, "*, *".join(user_names))]
+
+    slack_call(
+        "chat.postEphemeral",
+        channel=payload['channel'],
+        user=payload['user'],
+        text="Group memberships:\n%s"%("\n".join(listings)),
+        as_user=True
+    )
+
+
 def handle_command(command, payload):
     """
     Given a command, fork off into different possible handlers.
@@ -285,7 +305,10 @@ def handle_command(command, payload):
         'sign': handle_sign,
         'stop': handle_stop,
         'list': handle_list,
+
+        # Super secret commands
         'create_chats': handle_secret_create_chats,
+        'dump_groups': handle_secret_dump_groups,
     }
 
     handler = commands.get(command, handle_unknown)
@@ -300,6 +323,18 @@ def get_user_first_name(user):
         return user_obj["profile"]["first_name"]
     else:
         return user_obj["name"]
+
+def get_user_full_name(user):
+    user_obj = slack_call("users.info", user=user)["user"]
+
+    # If they have filled out their profile to have a first name use that,
+    # otherwise fall back on their username:
+    if "profile" in user_obj:
+        profile = user_obj["profile"]
+        if "first_name" in profile and "last_name" in profile:
+            return "%s %s"%(profile["first_name"], profile["last_name"])
+
+    return user_obj["name"]
 
 def find_user_id(username):
     username = username.lower()
