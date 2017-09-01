@@ -58,7 +58,8 @@ class DataBase:
         self.db = shelve.open(path)
         logging.info("Loaded databse which knows about %d prayer groups"%(len(self.db.keys())))
 
-    def close(self):
+    def __del__(self):
+        logging.info("Gracefully closing database...")
         self.db.close()
 
     def add_user_to_group(self, user, group):
@@ -329,6 +330,7 @@ def create_group_chat(users):
         "mpim.open",
         users=",".join(users + [bot_id()]),
     )["group"]["id"]
+    logging.info("  group chat created: %s"%(group_id))
 
     msg = "This is a private group message for *%s* for the week "%(names_str)
     msg += "of %s. Feel free to talk and share prayer requests "%(date_str)
@@ -340,6 +342,12 @@ def create_group_chat(users):
         channel=group_id,
         text=msg,
         as_user=True
+    )
+
+    # Then immediately leave the group message
+    slack_call(
+        "groups.leave",
+        channel=group_id,
     )
 
 last_weekly_chat_creation = None
@@ -446,7 +454,6 @@ def event_loop():
 
     except KeyboardInterrupt:
         logging.info("Gracefully shutting down...")
-        db.close()
 
 
 if __name__ == "__main__":
