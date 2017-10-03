@@ -361,7 +361,10 @@ def get_user_first_name(user):
         return user_obj["name"]
 
 def get_user_full_name(user):
-    user_obj = slack_call("users.info", user=user)["user"]
+    try:
+        user_obj = slack_call("users.info", user=user)["user"]
+    except:
+        return user
 
     # If they have filled out their profile to have a first name use that,
     # otherwise fall back on their username:
