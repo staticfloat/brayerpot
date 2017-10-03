@@ -24,6 +24,13 @@ def slack_call(api_name, **kwargs):
         logging.warn("Could not complete api call %s: %s", api_name, api_call)
         raise RuntimeError("slack call %s failed"%(api_name))
 
+def chat_type(payload):
+    if not is_im_to_me(payload):
+        return "chat.postEphemeral"
+    else:
+        return "chat.postMessage"
+
+
 def bot_id(force=False):
     """
     Find our bot id on this particular Slack, cached in global `BOT_ID`, will
@@ -52,6 +59,11 @@ def is_im_to_me(payload):
     im_list = slack_call('im.list')['ims']
     return any(payload['channel'] == im['id'] for im in im_list)
 
+def is_from_me(payload):
+    """
+    Given a payload, look at the user and see if it's a message from me.
+    """
+    return payload['user'] == bot_id()
 
 class DataBase:
     def __init__(self, path):
@@ -157,7 +169,7 @@ When you are a part of a prayer group, I will randomly pair participants of a gr
     """
 
     slack_call(
-        "chat.postEphemeral",
+        chat_type(payload),
         channel=payload['channel'],
         user=payload['user'],
         text=help_msg,
@@ -184,7 +196,7 @@ def handle_signup(payload):
         msg = "You need to give me a group name. Look at `@prayerbot help`"
 
     slack_call(
-        "chat.postEphemeral",
+        chat_type(payload),
         channel=payload['channel'],
         user=payload['user'],
         text=msg,
@@ -231,7 +243,7 @@ def handle_stop(payload):
         msg = "You have been removed from *all* prayer groups"
 
     slack_call(
-        "chat.postEphemeral",
+        chat_type(payload),
         channel=payload['channel'],
         user=payload['user'],
         text=msg,
@@ -250,7 +262,7 @@ def handle_list(payload):
         msg = "You are not a part of any prayer groups. Use `@prayerbot signup` to join some, or try `@prayerbot help` to learn more!"
 
     slack_call(
-        "chat.postEphemeral",
+        chat_type(payload),
         channel=payload['channel'],
         user=payload['user'],
         text=msg,
@@ -259,7 +271,7 @@ def handle_list(payload):
 
 def handle_unknown(payload):
     slack_call(
-        "chat.postEphemeral",
+        chat_type(payload),
         channel=payload['channel'],
         user=payload['user'],
         text="Sorry, I don't what that means. Try `@prayerbot help`",
@@ -283,7 +295,7 @@ def handle_secret_dump_groups(payload):
         listings += ["*%s*: *%s*"%(g, "*, *".join(user_names))]
 
     slack_call(
-        "chat.postEphemeral",
+        chat_type(payload),
         channel=payload['channel'],
         user=payload['user'],
         text="Group memberships:\n%s"%("\n".join(listings)),
@@ -295,6 +307,10 @@ def handle_command(command, payload):
     """
     Given a command, fork off into different possible handlers.
     """
+    # First, make sure we're not responding to ourselves
+    if is_from_me(payload):
+        return
+
     name = get_user_first_name(payload['user'])
     logging.info("Handling command %s from %s", command, name)
 
