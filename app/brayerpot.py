@@ -176,6 +176,25 @@ When you are a part of a prayer group, I will randomly pair participants of a gr
         as_user=True
     )
 
+def handle_secret_help(payload):
+    handle_help(payload)
+    help_msg = """
+Some secret commands:
+
+- `dump_groups`
+
+- `create_chats`
+
+- `secret_help`
+    """
+    slack_call(
+        chat_type(payload),
+        channel=payload['channel'],
+        user=payload['user'],
+        text=help_msg,
+        as_user=True
+    )
+
 
 def handle_signup(payload):
     """
@@ -325,6 +344,7 @@ def handle_command(command, payload):
         # Super secret commands
         'create_chats': handle_secret_create_chats,
         'dump_groups': handle_secret_dump_groups,
+        'secret_help': handle_secret_help,
     }
 
     handler = commands.get(command, handle_unknown)
