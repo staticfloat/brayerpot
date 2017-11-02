@@ -434,12 +434,12 @@ def weekly_chat_creation_time():
     day_of_week = datetime.date.today().weekday()
     now = datetime.datetime.now()
 
-    # If it's wednesday and it's after 11:
-    if day_of_week == 2 and now.time() > datetime.time(23):
-        # If we've never done this before, just do it now
+    # If it's thursday and it's after 8am:
+    if day_of_week == 3 and now.time() > datetime.time(8):
+        # If we've never done this before, don't do it
         if last_weekly_chat_creation is None:
             last_weekly_chat_creation = now
-            return True
+            return False
         # Otherwise, only do it if the last time we did it was more than 3 days ago
         elif now - last_weekly_chat_creation > datetime.timedelta(days=3):
             last_weekly_chat_creation = now
