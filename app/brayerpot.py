@@ -89,7 +89,7 @@ def get_now():
     import datetime
     import pytz
 
-    return datetime.datetime.now().replace(tzinfo=pytz.utc)
+    return datetime.datetime.now().astimezone(pytz.utc)
 
 class DataBase:
     def __init__(self, path):
@@ -223,16 +223,15 @@ class DataBase:
         if group in self.db['group_times']:
             t = self.db['group_times'][group]
 
-            # Start from the last trigger point
-            dt = t['last_trigger']
+            # Start from the last trigger point, converting to PST
+            dt = t['last_trigger'].astimezone(pytz.timezone('US/Pacific'))
 
             # Go to the next week's day that we care about
             skip_days = 7*t['trigger_weeks']
-            dt += timedelta(days=(t['trigger_day'] - dt.weekday()+skip_days)%7)
+            dt += timedelta(days=(t['trigger_day'] - dt.weekday()+skip_days)%skip_days)
 
-            # Set the hour appropriately, and convert to Pacific time
-            dt.replace(hour=t['trigger_hour'], tzinfo=pytz.utc)
-            dt = dt.astimezone(pytz.timezone('US/Pacific'))
+            # Set the hour and seconds and whatnot appropriately
+            dt = dt.replace(hour=t['trigger_hour'], minute=0, second=0, microsecond=0)
 
             # Return that
             return dt
