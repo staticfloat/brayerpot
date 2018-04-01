@@ -1,2 +1,5 @@
 # Ignore our database files
 db/
+
+# Ignore __pycache__
+__pycache__
