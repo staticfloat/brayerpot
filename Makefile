@@ -16,5 +16,8 @@ run: build
 stop:
 	docker-compose stop
 
+destroy:
+	docker-compose down
+
 logs:
 	docker-compose logs -f

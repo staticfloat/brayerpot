@@ -65,10 +65,59 @@ def is_from_me(payload):
     """
     return payload['user'] == bot_id()
 
+def day_to_int(day):
+    mapping = {
+        'mon': 0, 'monday': 0,
+        'tues': 1, 'tuesday': 1,
+        'wed': 2, 'wednesday': 2,
+        'thurs': 3, 'thursday': 3,
+        'fri': 4, 'friday': 4,
+        'sat': 5, 'saturday': 5,
+        'sun': 6, 'sunday': 6,
+    }
+    day = day.lower()
+    return mapping[day]
+
+def int_to_day(day):
+    mapping = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+        'Friday', 'Saturday', 'Sunday',
+    ]
+    return mapping[day]
+
+def get_now():
+    import datetime
+    import pytz
+
+    return datetime.datetime.now().replace(tzinfo=pytz.utc)
+
 class DataBase:
     def __init__(self, path):
         self.db = shelve.open(path)
-        logging.info("Loaded databse which knows about %d prayer groups"%(len(self.db.keys())))
+        
+        # Initialize some data within the db if it doesn't already exist
+        if 'groups' not in self.db:
+            # If we need to migrate some old data, do so!
+            if len(self.db.keys()) > 0:
+                logging.info("Migrating old data...")
+                old_data = {k: self.db[k] for k in self.db}
+                self.db.clear()
+
+                self.db['groups'] = {}
+                self.db['group_times'] = {}
+
+                for group in old_data:
+                    for user in old_data[group]:
+                        self.add_user_to_group(user, group)
+            else:
+                # Otherwise, just initialize to empty...
+                self.db['groups'] = {}
+                self.db['group_times'] = {}
+
+        num_groups = len(self.db['groups'])
+        logging.info("Loaded DB containing %d prayer groups"%(num_groups))
+        logging.info(self.db['groups'])
+        logging.info(self.db['group_times'])
 
     def __del__(self):
         logging.info("Gracefully closing database...")
@@ -79,12 +128,19 @@ class DataBase:
         Add a user to a group, returning the group afterward
         """
         group = group.lower()
-        if not group in self.db:
-            self.db[group] = [user]
+        if not group in self.db['groups']:
+            gs = self.db['groups']
+            gs[group] = [user]
+            self.db['groups'] = gs
+
+            # By default, trigger this group on Wednesday nights at 11pm every week
+            self.set_group_time(group, 1, day_to_int('Wednesday'), 23)
         else:
-            if not user in self.db[group]:
-                self.db[group] = self.db[group] + [user]
-        return self.db[group]
+            if not user in self.db['groups'][group]:
+                gs = self.db['groups']
+                gs[group] += [user]
+                self.db['groups'] = gs
+        return self.db['groups'][group]
 
     def remove_user_from_group(self, user, group):
         """
@@ -96,18 +152,27 @@ class DataBase:
         if not group in self.db:
             return []
         
-        if not user in self.db[group]:
-            return self.db[group]
+        if not user in self.db['groups'][group]:
+            return self.db['groups'][group]
         
-        d = self.db[group]
+        d = self.db['groups'][group]
         d.remove(user)
 
         # If that group is empty now, delete it
         if not d:
-            del self.db[group]
+            gs = self.db['groups']
+            del gs[group]
+            self.db['groups'] = gs
+
+            gt = self.db['group_times']
+            del gt[group]
+            self.db['group_times'] = gt
+
             return []
 
-        self.db[group] = d
+        gs = self.db['groups']
+        gs[group] = d
+        self.db['groups'] = gs
         return d
 
     def remove_user_from_all_groups(self, user):
@@ -117,24 +182,90 @@ class DataBase:
         for group in self.db:
             self.remove_user_from_group(user, group)
 
+    def set_group_time(self, group, trigger_weeks, trigger_day, trigger_hour):
+        """
+        Set the time that chats get triggered, by passing in a trigger day
+        (such that 0 == monday, 6 == sunday) and a trigger hour (15 == 3pm)
+        """
+        group = group.lower()
+        if group in self.db['groups']:
+            gt = self.db['group_times']
+            gt[group] = {
+                'trigger_weeks': trigger_weeks,
+                'trigger_day': trigger_day,
+                'trigger_hour': trigger_hour,
+                'last_trigger': get_now(),
+            }
+            self.db['group_times'] = gt
+
+            logging.info("Set group %s to trigger on %s at %02d:00",
+                         group, int_to_day(trigger_day), trigger_hour)
+        else:
+            logging.warn("Group %s doesn't exist, can't set time!", group)
+
+    def get_group_trigger_info(self, group):
+        group = group.lower()
+        if group in self.db['group_times']:
+            tinfo = self.db['group_times'][group]
+            weeks = tinfo['trigger_weeks']
+            day = int_to_day(tinfo['trigger_day'])
+            hour = tinfo['trigger_hour']
+            return day, hour, weeks
+
+    def get_group_trigger_date(self, group):
+        """
+        Return the next trigger date for a group
+        """
+        from datetime import timedelta
+        import pytz
+
+        group = group.lower()
+        if group in self.db['group_times']:
+            t = self.db['group_times'][group]
+
+            # Start from the last trigger point
+            dt = t['last_trigger']
+
+            # Go to the next week's day that we care about
+            skip_days = 7*t['trigger_weeks']
+            dt += timedelta(days=(t['trigger_day'] - dt.weekday()+skip_days)%7)
+
+            # Set the hour appropriately, and convert to Pacific time
+            dt.replace(hour=t['trigger_hour'], tzinfo=pytz.utc)
+            dt = dt.astimezone(pytz.timezone('US/Pacific'))
+
+            # Return that
+            return dt
+        else:
+            logging.warn("Group %s doesn't exist, can't get trigger date!", group)
+
+    def set_group_triggered(self, group):
+        group = group.lower()
+        if group in self.db['group_times']:
+            gt = self.db['group_times']
+            gt[group]['last_trigger'] = get_now()
+            self.db['group_times'] = gt
+        else:
+            logging.warn("Group %s doesn't exist, can't set triggered!", group)
+
     def list_groups(self, user):
         """
         List groups for a user
         """
-        return [group for group in self.db if user in self.db[group]]
+        return [group for group in self.db if user in self.db['groups'][group]]
 
     def list_all_groups(self):
         """
         List all groups
         """
-        return [group for group in self.db]
+        return [group for group in self.db['groups']]
 
     def get_group(self, group):
         """
         Given a group ID, return the group.  Duh.
         """
         group = group.lower()
-        return self.db[group]
+        return self.db['groups'][group]
 
 db = None
 def get_db():
@@ -165,7 +296,7 @@ This will put you into the prayer rotations for the LW guys prayer group, where 
 
 -  `list`: List all groups you're in.
 
-When you are a part of a prayer group, I will randomly pair participants of a group up into prayer buddies once a week on Wednesday nights.
+When you are a part of a prayer group, I will randomly pair participants of a group up into prayer buddies once a week on Wednesday nights (this can be changed).
     """
 
     slack_call(
@@ -183,7 +314,9 @@ Some secret commands:
 
 - `dump_groups`
 
-- `create_chats`
+- `trigger_chats`
+
+- `set_time group day hour weeks`
 
 - `secret_help`
     """
@@ -213,6 +346,43 @@ def handle_signup(payload):
             msg += "\nYou're the only one in this group for now; if you meant to join another group, make sure you spelled the group name correctly!"
     except IndexError:
         msg = "You need to give me a group name. Look at `@prayerbot help`"
+
+    slack_call(
+        chat_type(payload),
+        channel=payload['channel'],
+        user=payload['user'],
+        text=msg,
+        as_user=True
+    )
+
+def handle_set_time(payload):
+    """
+    Given a signup command, add the user to groups
+    """
+    from re import split, IGNORECASE
+    db = get_db()
+
+    try:
+        splitted = split("set_time", payload['text'], flags=IGNORECASE)
+        group, day, hour, weeks = splitted[1].strip().split()
+
+        try:
+            day = int(day)
+        except:
+            day = day_to_int(day)
+        hour = int(hour)
+        weeks = int(weeks)
+
+        db.set_group_time(group, weeks, day, hour)
+        msg = "Group *%s* will trigger on *%s* at *%d:00* every *%d* weeks"%(
+            group, int_to_day(day), hour, weeks
+        )
+        next_time = db.get_group_trigger_date(group).strftime("*%A*, *%B %d* at *%-I:%M* %p %Z")
+        msg += "\nNext scheduled trigger time: %s"%(next_time)
+    except IndexError:
+        msg = "You need to give me a group, day, hour and weeks. Look at `@prayerbot help`"
+    except AttributeError:
+        msg = "You need to give me a group, day, hour and weeks. Look at `@prayerbot help`"
 
     slack_call(
         chat_type(payload),
@@ -297,10 +467,18 @@ def handle_unknown(payload):
         as_user=True
     )
 
-def handle_secret_create_chats(payload):
+def handle_secret_trigger_chats(payload):
+    from re import split, IGNORECASE
     name = get_user_first_name(payload['user'])
     logging.info("RED ALERT! SHIELDS TO MAXIMUM! %s knows our secrets!", name)
-    create_weekly_group_chats()
+
+    try:
+        splitted = split("trigger_chats", payload['text'], flags=IGNORECASE)
+        group = splitted[1].strip().split()[0]
+
+        trigger_weekly_group_chats(group)
+    except:
+        trigger_weekly_group_chats()
 
 def handle_secret_dump_groups(payload):
     name = get_user_first_name(payload['user'])
@@ -310,8 +488,10 @@ def handle_secret_dump_groups(payload):
     groups = db.list_all_groups()
     listings = []
     for g in groups:
-        user_names = [get_user_full_name(u) for u in db.get_group(g)]
-        listings += ["*%s*: *%s*"%(g, "*, *".join(user_names))]
+        names = [get_user_full_name(u) for u in db.get_group(g)]
+        names = "*%s*"%("*, *".join(names))
+        day, hour, weeks = db.get_group_trigger_info(g)
+        listings += ["*%s* on *%s* at *%d:00* every *%d* weeks: %s"%(g, day, hour, weeks, names)]
 
     slack_call(
         chat_type(payload),
@@ -340,9 +520,10 @@ def handle_command(command, payload):
         'sign': handle_sign,
         'stop': handle_stop,
         'list': handle_list,
+        'set_time': handle_set_time,
 
         # Super secret commands
-        'create_chats': handle_secret_create_chats,
+        'trigger_chats': handle_secret_trigger_chats,
         'dump_groups': handle_secret_dump_groups,
         'secret_help': handle_secret_help,
     }
@@ -424,38 +605,32 @@ def create_group_chat(users):
         channel=group_id,
     )
 
-last_weekly_chat_creation = None
-def weekly_chat_creation_time():
-    """
-    We will run weekly chat creation at 11:00 pm on Wednesday nights
-    """
+def check_groups_to_trigger():
     import datetime
-    global last_weekly_chat_creation
-    day_of_week = datetime.date.today().weekday()
-    now = datetime.datetime.now()
+    db = get_db()
 
-    # If it's thursday and it's after 8am:
-    if day_of_week == 3 and now.time() > datetime.time(8):
-        # If we've never done this before, don't do it
-        if last_weekly_chat_creation is None:
-            last_weekly_chat_creation = now
-            return False
-        # Otherwise, only do it if the last time we did it was more than 3 days ago
-        elif now - last_weekly_chat_creation > datetime.timedelta(days=3):
-            last_weekly_chat_creation = now
-            return True
-    # By default, don't do it
-    return False
+    now = get_now()
+
+    for group in db.list_all_groups():
+        trigger_date = db.get_group_trigger_date(group)
+
+        # If we are after that date, trigger!
+        if now > trigger_date:
+            trigger_weekly_group_chats(group)
 
 
-def create_weekly_group_chats():
+def trigger_weekly_group_chats(group_to_trigger=None):
     """
     For each group that we know about, group the participants into 2s and 3s.
     """
     from random import shuffle
     db = get_db()
 
-    for group in db.list_all_groups():
+    groups = [group_to_trigger]
+    if group_to_trigger is None:
+        groups = db.list_all_groups()
+
+    for group in groups:
         users = db.get_group(group)
 
         if len(users) == 1:
@@ -475,9 +650,12 @@ def create_weekly_group_chats():
             except:
                 logging.warn("Could not create group chat for %s", ", ".join(grouping))
 
+        # Set this group as TOTALLY TRIGGERED
+        db.set_group_triggered(group)
+
 
 def event_loop():
-    from time import sleep
+    from time import time, sleep
     db = get_db()
 
     if not slack_client.rtm_connect():
@@ -485,6 +663,7 @@ def event_loop():
         raise RuntimeError("rtm_connect() failed")
 
     logging.info("All systems operational")
+    last_check = 0
 
     try:
         # Find <@bot_id> pieces of text:
@@ -522,9 +701,10 @@ def event_loop():
                 # Don't burn _all_ the CPUs
                 sleep(0.01)
 
-                # Check to see if it's cronjob time....
-                if weekly_chat_creation_time():
-                    create_weekly_group_chats()
+                # Check once a minute to see if there are any groups to trigger...
+                if time() - last_check > 60:
+                    check_groups_to_trigger()
+                    last_check = time()
 
     except KeyboardInterrupt:
         logging.info("Gracefully shutting down...")

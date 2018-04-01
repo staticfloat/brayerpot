@@ -8,14 +8,14 @@ services:
                 - SLACK_API_TOKEN=${SLACK_API_TOKEN}
         volumes:
             - ./db:/var/lib/brayerpot/
-    webhook:
-        restart: unless-stopped
-        image: staticfloat/docker-webhook
-        volumes:
-            - ./:/brayerpot
-            - /var/run/docker.sock:/var/run/docker.sock
-        environment:
-            - WEBHOOK_SECRET=${WEBHOOK_SECRET}
-            - WEBHOOK_HOOKS_DIR=/brayerpot/hooks
-        ports:
-            - 8000:8000/tcp
+    # webhook:
+    #     restart: unless-stopped
+    #     image: staticfloat/docker-webhook
+    #     volumes:
+    #         - ./:/brayerpot
+    #         - /var/run/docker.sock:/var/run/docker.sock
+    #     environment:
+    #         - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+    #         - WEBHOOK_HOOKS_DIR=/brayerpot/hooks
+    #     ports:
+    #         - 8000:8000/tcp
